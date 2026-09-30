@@ -16,6 +16,14 @@ import 'core/services/supabase_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  if (SupabaseConfig.url.isEmpty || SupabaseConfig.anonKey.isEmpty) {
+    throw StateError(
+      'Missing Supabase credentials. Build with:\n'
+      '  flutter run --dart-define=SUPABASE_URL=<project-url> '
+      '--dart-define=SUPABASE_ANON_KEY=<anon-key>',
+    );
+  }
+
   // Bengali digits/month names for DateFormat(..., 'bn') used across the app.
   await initializeDateFormatting('bn');
 
