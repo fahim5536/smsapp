@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need this explicitly; debug/profile manifests already
+         carry it. Without it the installed APK cannot reach Supabase. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- The app opens the default SMS app via sms: links (url_launcher);
          SEND_SMS is intentionally NOT requested. -->
     <application
