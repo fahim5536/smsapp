@@ -170,16 +170,20 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                     return _AttendanceStudentTile(
                       student: student,
                       record: record,
-                      onMarkPresent: () => _markAttendance(
-                        student,
-                        AttendanceStatus.present,
-                        sendSms: false,
-                      ),
-                      onMarkAbsent: () => _markAttendance(
-                        student,
-                        AttendanceStatus.absent,
-                        sendSms: true,
-                      ),
+                      onMarkPresent: () => record?.status == AttendanceStatus.present
+                          ? _unmarkAttendance(student)
+                          : _markAttendance(
+                              student,
+                              AttendanceStatus.present,
+                              sendSms: false,
+                            ),
+                      onMarkAbsent: () => record?.status == AttendanceStatus.absent
+                          ? _unmarkAttendance(student)
+                          : _markAttendance(
+                              student,
+                              AttendanceStatus.absent,
+                              sendSms: true,
+                            ),
                       onSendSms: () => _resendSms(student),
                     );
                   },
@@ -477,12 +481,37 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     }
   }
 
+  Future<void> _unmarkAttendance(StudentModel student) async {
+    final success = await ref
+        .read(attendanceMapProvider.notifier)
+        .unmarkStudent(student.id);
+
+    if (mounted && !success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.danger,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          content: Text(
+            '${student.fullName}-এর হাজিরা মুছতে সমস্যা হয়েছে',
+            style: GoogleFonts.outfit(color: Colors.white),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _resendSms(StudentModel student) async {
     final coaching = ref.read(coachingNameProvider);
-    final launched = await SmsService.sendAbsentSms(
-      guardianPhone: student.parentPhone,
+    final message = SmsService.generateAbsentMessage(
       studentName: student.fullName,
       customCoachingName: coaching,
+    );
+    final launched = await SmsService.launchSms(
+      phone: student.parentPhone,
+      message: message,
     );
     if (!launched && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

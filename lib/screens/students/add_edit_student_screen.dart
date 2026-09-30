@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/services/supabase_service.dart';
+import '../../core/services/sms_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/student_model.dart';
+import '../../providers/attendance_provider.dart';
+import '../../providers/sms_provider.dart';
 import '../../providers/student_provider.dart';
 
 /// Screen for both ADDING a new student and EDITING an existing one.
@@ -102,6 +105,10 @@ class _AddEditStudentScreenState extends ConsumerState<AddEditStudentScreen> {
     if (!mounted) return;
 
     if (success) {
+      if (!_isEdit) {
+        await _askSendWelcomeSms(student);
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppTheme.success,
@@ -128,6 +135,72 @@ class _AddEditStudentScreenState extends ConsumerState<AddEditStudentScreen> {
         ),
       );
     }
+  }
+
+  // ── Welcome SMS after admission ────────────────────────────
+  Future<void> _askSendWelcomeSms(StudentModel student) async {
+    final send = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.cardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'স্বাগত বার্তা পাঠাবেন?',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          '${student.fullName}-এর অভিভাবকের নম্বরে (${student.parentPhone}) ভর্তির স্বাগত SMS পাঠানো হবে।',
+          style: GoogleFonts.outfit(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'পরে',
+              style: GoogleFonts.outfit(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'SMS পাঠান',
+              style: GoogleFonts.outfit(
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (send != true || !mounted) return;
+
+    final coaching = ref.read(coachingNameProvider);
+    final message = SmsService.renderTemplate(
+      SmsService.getTemplate(SmsService.templateWelcome),
+      variables: {
+        'student_name': student.fullName,
+        'grade': student.grade,
+        'subject': student.subject,
+        'schedule': student.schedule ?? '',
+        'coaching_name': coaching,
+      },
+    );
+    final sent = await SmsService.sendCustomSms(
+      phone: student.parentPhone,
+      message: message,
+    );
+    await ref.read(smsLogProvider.notifier).logSms(
+          phone: student.parentPhone,
+          studentName: student.fullName,
+          message: message,
+          type: SmsType.welcome,
+          success: sent,
+        );
   }
 
   // ── Build ──────────────────────────────────────────────────

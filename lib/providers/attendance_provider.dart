@@ -3,6 +3,7 @@ import '../core/services/sms_service.dart';
 import '../models/attendance_model.dart';
 import '../models/student_model.dart';
 import '../repositories/attendance_repository.dart';
+import 'sms_provider.dart';
 
 // ── Repository Provider ─────────────────────────────────────────
 final attendanceRepositoryProvider = Provider<AttendanceRepository>(
@@ -98,23 +99,35 @@ class AttendanceMapNotifier
 
       // Update with server returned record
       state = AsyncData({...state.value ?? {}, student.id: saved});
-
-      // If absent and autoSendSms is true, trigger Android SMS
-      if (status == AttendanceStatus.absent && autoSendSms) {
-        final coaching = ref.read(coachingNameProvider);
-        await SmsService.sendAbsentSms(
-          guardianPhone: student.parentPhone,
-          studentName: student.fullName,
-          customCoachingName: coaching,
-        );
-      }
-      return true;
-    } catch (e, st) {
-      // Revert on error
+    } catch (e) {
+      // Save failed — revert the optimistic update. Attendance is not
+      // rolled back by an SMS failure; that is handled separately below.
       state = AsyncData(previousState);
-      state = AsyncError(e, st);
       return false;
     }
+
+    // If absent and autoSendSms is true, trigger the SMS app.
+    // A launch failure must not undo the saved attendance.
+    if (status == AttendanceStatus.absent && autoSendSms) {
+      final coaching = ref.read(coachingNameProvider);
+      final message = SmsService.generateAbsentMessage(
+        studentName: student.fullName,
+        customCoachingName: coaching,
+        date: date,
+      );
+      final sent = await SmsService.sendCustomSms(
+        phone: student.parentPhone,
+        message: message,
+      );
+      await ref.read(smsLogProvider.notifier).logSms(
+            phone: student.parentPhone,
+            studentName: student.fullName,
+            message: message,
+            type: SmsType.absent,
+            success: sent,
+          );
+    }
+    return true;
   }
 
   /// Marks all specified students as Present in one batch operation
@@ -124,7 +137,8 @@ class AttendanceMapNotifier
     final date = ref.read(selectedAttendanceDateProvider);
     final repo = ref.read(attendanceRepositoryProvider);
 
-    final currentMap = Map<String, AttendanceModel>.from(state.value ?? {});
+    final previousMap = Map<String, AttendanceModel>.from(state.value ?? {});
+    final currentMap = Map<String, AttendanceModel>.from(previousMap);
 
     for (final s in students) {
       currentMap[s.id] = AttendanceModel(
@@ -147,8 +161,8 @@ class AttendanceMapNotifier
       // Reload fresh records
       ref.invalidateSelf();
       return true;
-    } catch (e, st) {
-      state = AsyncError(e, st);
+    } catch (e) {
+      state = AsyncData(previousMap);
       return false;
     }
   }
@@ -158,15 +172,16 @@ class AttendanceMapNotifier
     final date = ref.read(selectedAttendanceDateProvider);
     final repo = ref.read(attendanceRepositoryProvider);
 
-    final currentMap = Map<String, AttendanceModel>.from(state.value ?? {});
-    currentMap.remove(studentId);
+    final previousMap = Map<String, AttendanceModel>.from(state.value ?? {});
+    final currentMap = Map<String, AttendanceModel>.from(previousMap)
+      ..remove(studentId);
     state = AsyncData(currentMap);
 
     try {
       await repo.removeAttendance(studentId: studentId, date: date);
       return true;
-    } catch (e, st) {
-      state = AsyncError(e, st);
+    } catch (e) {
+      state = AsyncData(previousMap);
       return false;
     }
   }

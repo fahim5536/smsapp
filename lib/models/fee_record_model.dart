@@ -90,7 +90,16 @@ class FeeRecordModel {
 
     final totalAmount = (json['amount'] as num?)?.toDouble() ?? 0.0;
     final feeStatus = FeeStatus.fromString(json['status']?.toString() ?? 'Due');
-    final paidAmount = feeStatus == FeeStatus.paid ? totalAmount : 0.0;
+    // Prefer the persisted paid_amount; fall back to deriving it from
+    // status for rows written before the column existed.
+    final double paidAmount;
+    if (json['paid_amount'] != null) {
+      paidAmount = (json['paid_amount'] as num?)?.toDouble() ?? 0.0;
+    } else if (feeStatus == FeeStatus.paid) {
+      paidAmount = totalAmount;
+    } else {
+      paidAmount = 0.0;
+    }
 
     return FeeRecordModel(
       id: (json['id'] ?? '') as String,
@@ -108,9 +117,11 @@ class FeeRecordModel {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
-      updatedAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : (json['created_at'] != null
+              ? DateTime.parse(json['created_at'] as String)
+              : DateTime.now()),
     );
   }
 
@@ -119,8 +130,10 @@ class FeeRecordModel {
       'student_id': studentId,
       'month': '$year-${month.toString().padLeft(2, '0')}',
       'amount': amount,
+      'paid_amount': paidAmount,
       'status': status.value,
       'paid_date': paidDate?.toIso8601String(),
+      if (note != null) 'note': note,
     };
     if (includeId && id.isNotEmpty) {
       map['id'] = id;

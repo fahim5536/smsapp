@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/services/sms_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/fee_record_model.dart';
 import '../../models/student_model.dart';
+import '../../providers/attendance_provider.dart';
 import '../../providers/fee_provider.dart';
+import '../../providers/sms_provider.dart';
 import '../../providers/student_provider.dart';
 
 class FeeListScreen extends ConsumerStatefulWidget {
@@ -407,6 +410,7 @@ class _FeeListScreenState extends ConsumerState<FeeListScreen> {
           : fee.amount.toStringAsFixed(0),
     );
     final noteCtrl = TextEditingController(text: fee.note);
+    var sendConfirmationSms = true;
 
     showModalBottomSheet(
       context: context,
@@ -415,7 +419,8 @@ class _FeeListScreenState extends ConsumerState<FeeListScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
         padding: EdgeInsets.only(
           left: 20,
           right: 20,
@@ -491,18 +496,56 @@ class _FeeListScreenState extends ConsumerState<FeeListScreen> {
                 prefixIcon: Icon(Icons.note_alt_outlined),
               ),
             ),
-            const SizedBox(height: 20),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: sendConfirmationSms,
+              activeThumbColor: AppTheme.success,
+              title: Text(
+                'পরিশোধের SMS পাঠান',
+                style: GoogleFonts.outfit(fontSize: 13, color: Colors.white),
+              ),
+              subtitle: Text(
+                student.parentPhone,
+                style: GoogleFonts.outfit(fontSize: 11, color: Colors.white38),
+              ),
+              onChanged: (v) => setSheetState(() => sendConfirmationSms = v),
+            ),
+            const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () async {
                 final paidAmount = double.tryParse(paidCtrl.text.trim()) ?? 0;
                 Navigator.pop(ctx);
 
-                await ref.read(monthlyFeesProvider.notifier).recordPayment(
+                final success = await ref.read(monthlyFeesProvider.notifier).recordPayment(
                       studentId: student.id,
                       totalAmount: fee.amount,
                       paidAmount: paidAmount,
                       note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
                     );
+
+                if (!mounted) return;
+
+                if (success && sendConfirmationSms && paidAmount > 0) {
+                  final my = ref.read(selectedFeeMonthYearProvider);
+                  final coaching = ref.read(coachingNameProvider);
+                  final message = SmsService.generateFeePaidMessage(
+                    studentName: student.fullName,
+                    paidAmount: paidAmount,
+                    monthYear: my.displayBn,
+                    customCoachingName: coaching,
+                  );
+                  final sent = await SmsService.sendCustomSms(
+                    phone: student.parentPhone,
+                    message: message,
+                  );
+                  await ref.read(smsLogProvider.notifier).logSms(
+                        phone: student.parentPhone,
+                        studentName: student.fullName,
+                        message: message,
+                        type: SmsType.feePaid,
+                        success: sent,
+                      );
+                }
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -520,6 +563,7 @@ class _FeeListScreenState extends ConsumerState<FeeListScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -67,13 +67,23 @@ class StudentModel {
   }
 
   // ── Serialize for INSERT / UPDATE ─────────────────────────
-  // Matches Supabase `students` table: name, class_name, subject, guardian_phone, monthly_fee
+  // Matches Supabase `students` table. Null fields are omitted so a
+  // partial edit never wipes existing database values.
   Map<String, dynamic> toJson() => {
+        if (teacherId != null) 'teacher_id': teacherId,
         'name': fullName,
+        if (phone != null) 'phone': phone,
+        if (parentName != null) 'parent_name': parentName,
+        'guardian_phone': parentPhone,
+        if (address != null) 'address': address,
         'class_name': grade,
         'subject': subject,
-        'guardian_phone': parentPhone,
         'monthly_fee': monthlyFee,
+        if (schedule != null) 'schedule': schedule,
+        'admission_date':
+            '${admissionDate.year.toString().padLeft(4, '0')}-${admissionDate.month.toString().padLeft(2, '0')}-${admissionDate.day.toString().padLeft(2, '0')}',
+        'is_active': isActive,
+        if (notes != null) 'notes': notes,
       };
 
   // ── Immutable copy ─────────────────────────────────────────

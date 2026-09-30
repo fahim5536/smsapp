@@ -80,8 +80,13 @@ class ClassRoutineModel {
     final map = <String, dynamic>{
       'class_name': subject,
       'day': dayNameBn,
+      'day_of_week': dayOfWeek,
       'time': timeRange,
-      'topic': topic,
+      'start_time': startTime,
+      'end_time': endTime,
+      if (topic != null) 'topic': topic,
+      if (location != null) 'location': location,
+      'is_active': isActive,
     };
     if (includeId && id.isNotEmpty) {
       map['id'] = id;

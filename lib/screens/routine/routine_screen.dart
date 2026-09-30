@@ -460,6 +460,7 @@ class _RoutineScreenState extends ConsumerState<RoutineScreen> {
                       .sendRoutineSms(
                         routine: routine,
                         recipientPhone: phone,
+                        recipientName: selectedStudent?.fullName,
                       );
 
                   if (mounted && launched) {

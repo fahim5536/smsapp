@@ -51,8 +51,10 @@ class FeeRepository {
       'student_id': studentId,
       'month': monthKey,
       'amount': totalAmount,
+      'paid_amount': paidAmount,
       'status': status.value,
       'paid_date': paidAmount > 0 ? DateTime.now().toIso8601String() : null,
+      if (note != null && note.isNotEmpty) 'note': note,
     };
 
     final data = await _db

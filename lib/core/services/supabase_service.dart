@@ -16,4 +16,7 @@ class SupabaseService {
 
   static Stream<AuthState> get authStateChanges =>
       client.auth.onAuthStateChange;
+
+  static Future<AuthResponse> signInAnonymously() async =>
+      client.auth.signInAnonymously();
 }

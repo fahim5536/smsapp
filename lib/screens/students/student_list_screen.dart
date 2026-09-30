@@ -8,17 +8,37 @@ import '../../models/student_model.dart';
 import '../../providers/student_provider.dart';
 import 'add_edit_student_screen.dart';
 
-class StudentListScreen extends ConsumerWidget {
+class StudentListScreen extends ConsumerStatefulWidget {
   const StudentListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StudentListScreen> createState() => _StudentListScreenState();
+}
+
+class _StudentListScreenState extends ConsumerState<StudentListScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Start from the current query (e.g. after returning to this screen).
+    _searchCtrl.text = ref.read(studentSearchQueryProvider);
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    ref.read(studentSearchQueryProvider.notifier).clear();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final studentsAsync = ref.watch(filteredStudentsProvider);
-    final searchCtrl = TextEditingController();
 
     return Scaffold(
       backgroundColor: AppTheme.bgDark,
-      appBar: _buildAppBar(context, ref, searchCtrl),
+      appBar: _buildAppBar(context),
       body: studentsAsync.when(
         data: (students) => students.isEmpty
             ? _EmptyState()
@@ -40,11 +60,7 @@ class StudentListScreen extends ConsumerWidget {
     );
   }
 
-  PreferredSizeWidget _buildAppBar(
-    BuildContext context,
-    WidgetRef ref,
-    TextEditingController ctrl,
-  ) {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       backgroundColor: AppTheme.bgDark,
       title: Text(
@@ -59,33 +75,31 @@ class StudentListScreen extends ConsumerWidget {
         preferredSize: const Size.fromHeight(64),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Consumer(
-            builder: (context, ref, _) => TextField(
-              controller: ctrl,
-              onChanged: (v) =>
-                  ref.read(studentSearchQueryProvider.notifier).update(v),
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search by name, class or subject…',
-                hintStyle: const TextStyle(color: Colors.white38),
-                prefixIcon:
-                    const Icon(Icons.search_rounded, color: Colors.white38),
-                suffixIcon: Consumer(
-                  builder: (_, ref, _) {
-                    final q = ref.watch(studentSearchQueryProvider);
-                    return q.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.white38),
-                            onPressed: () {
-                              ctrl.clear();
-                              ref
-                                  .read(studentSearchQueryProvider.notifier)
-                                  .update('');
-                            },
-                          )
-                        : const SizedBox.shrink();
-                  },
-                ),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) =>
+                ref.read(studentSearchQueryProvider.notifier).update(v),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search by name, class or subject…',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon:
+                  const Icon(Icons.search_rounded, color: Colors.white38),
+              suffixIcon: Consumer(
+                builder: (_, ref, _) {
+                  final q = ref.watch(studentSearchQueryProvider);
+                  return q.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.white38),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            ref
+                                .read(studentSearchQueryProvider.notifier)
+                                .clear();
+                          },
+                        )
+                      : const SizedBox.shrink();
+                },
               ),
             ),
           ),
@@ -316,7 +330,7 @@ class _DeleteButton extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+  void _confirmDelete(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(

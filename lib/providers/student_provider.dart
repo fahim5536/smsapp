@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/student_model.dart';
 import '../repositories/student_repository.dart';
 
@@ -14,22 +17,43 @@ final studentsStreamProvider = StreamProvider<List<StudentModel>>((ref) {
   return repo.watchStudents();
 });
 
-// ── Search query state ─────────────────────────────────────────
-class StudentSearchNotifier extends Notifier<String> {
+// ── Debounced search query ──────────────────────────────────────
+/// Debounced search notifier — waits 300ms after the last keystroke
+/// before emitting, so the list does not rebuild on every character.
+class DebouncedSearchNotifier extends Notifier<String> {
+  Timer? _timer;
+
   @override
-  String build() => '';
-  void update(String query) => state = query;
+  String build() {
+    ref.onDispose(() => _timer?.cancel());
+    return '';
+  }
+
+  void update(String query, {Duration delay = const Duration(milliseconds: 300)}) {
+    _timer?.cancel();
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      // Clearing the box should filter immediately, not after the delay.
+      _timer = null;
+      state = '';
+      return;
+    }
+    _timer = Timer(delay, () => state = trimmed);
+  }
+
+  void clear() {
+    _timer?.cancel();
+    state = '';
+  }
 }
 
 final studentSearchQueryProvider =
-    NotifierProvider<StudentSearchNotifier, String>(StudentSearchNotifier.new);
+    NotifierProvider<DebouncedSearchNotifier, String>(DebouncedSearchNotifier.new);
 
-
-/// Filtered students derived from the stream + search query.
-final filteredStudentsProvider =
-    Provider<AsyncValue<List<StudentModel>>>((ref) {
+// Filtered students derived from the stream + debounced search query.
+final filteredStudentsProvider = Provider<AsyncValue<List<StudentModel>>>((ref) {
   final studentsAsync = ref.watch(studentsStreamProvider);
-  final query = ref.watch(studentSearchQueryProvider).toLowerCase().trim();
+  final query = ref.watch(studentSearchQueryProvider).toLowerCase();
 
   return studentsAsync.whenData((students) {
     if (query.isEmpty) return students;
@@ -42,7 +66,7 @@ final filteredStudentsProvider =
   });
 });
 
-// ── Mutation state using Riverpod 3.x Notifier ────────────────
+// ── Mutation state ─────────────────────────────────────────────
 class StudentMutationNotifier extends Notifier<AsyncValue<void>> {
   @override
   AsyncValue<void> build() => const AsyncData(null);
@@ -88,5 +112,5 @@ class StudentMutationNotifier extends Notifier<AsyncValue<void>> {
 
 final studentMutationProvider =
     NotifierProvider<StudentMutationNotifier, AsyncValue<void>>(
-  StudentMutationNotifier.new,
-);
+      StudentMutationNotifier.new,
+    );

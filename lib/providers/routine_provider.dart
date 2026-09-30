@@ -3,6 +3,7 @@ import '../core/services/sms_service.dart';
 import '../models/class_routine_model.dart';
 import '../repositories/routine_repository.dart';
 import 'attendance_provider.dart';
+import 'sms_provider.dart';
 
 final routineRepositoryProvider =
     Provider<RoutineRepository>((_) => RoutineRepository());
@@ -86,17 +87,29 @@ class RoutineMutationNotifier extends Notifier<AsyncValue<void>> {
   Future<bool> sendRoutineSms({
     required ClassRoutineModel routine,
     required String recipientPhone,
+    String? recipientName,
     String? dayOrDate,
   }) async {
     final coaching = ref.read(coachingNameProvider);
-    return await SmsService.sendRoutineSms(
-      recipientPhone: recipientPhone,
+    final message = SmsService.generateRoutineMessage(
       subject: routine.subject,
       timeRange: routine.timeRange,
       topic: routine.topic,
       dayOrDate: dayOrDate ?? routine.dayNameBn,
       customCoachingName: coaching,
     );
+    final sent = await SmsService.sendCustomSms(
+      phone: recipientPhone,
+      message: message,
+    );
+    await ref.read(smsLogProvider.notifier).logSms(
+          phone: recipientPhone,
+          studentName: recipientName ?? '—',
+          message: message,
+          type: SmsType.routine,
+          success: sent,
+        );
+    return sent;
   }
 }
 

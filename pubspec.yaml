@@ -1,5 +1,5 @@
 name: tuition_app
-description: "A new Flutter project."
+description: "Tuition & coaching management app with attendance, fees, routines and SMS notifications."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -36,9 +36,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.17.2
   flutter_riverpod: ^3.4.3
+  riverpod: ^3.4.3
   google_fonts: ^8.2.1
   intl: ^0.20.3
   url_launcher: ^6.3.2
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:

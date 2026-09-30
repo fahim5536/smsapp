@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The app opens the default SMS app via sms: links (url_launcher);
+         SEND_SMS is intentionally NOT requested. -->
     <application
-        android:label="tuition_app"
+        android:label="Tuition Manager"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
